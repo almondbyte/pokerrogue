@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -108,6 +108,7 @@
             font-size: 1.8rem;
             color: var(--text-light);
             text-shadow: 0 0 5px rgba(255,255,255,0.5);
+            transition: color 0.2s, transform 0.1s;
         }
 
         .score-target {
@@ -119,14 +120,36 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             margin-top: 5px;
             opacity: 0; /* Hidden until calc */
             transition: opacity 0.3s;
+            font-weight: 900;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.8);
         }
 
-        .chips-val { color: var(--chip-color); }
-        .mult-val { color: var(--mult-color); }
+        .chips-val { color: var(--chip-color); transition: transform 0.1s; }
+        .mult-val { color: var(--mult-color); transition: transform 0.1s; }
+
+        /* Scoring Animation Classes */
+        .bump-val {
+            animation: bumpAnim 0.2s ease-out;
+        }
+        @keyframes bumpAnim {
+            0% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.5); filter: brightness(2); }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+        
+        .money-pulse {
+            animation: moneyPulse 0.5s ease-out;
+            color: #fff !important;
+        }
+        @keyframes moneyPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); text-shadow: 0 0 10px var(--gold); }
+            100% { transform: scale(1); }
+        }
 
         /* --- Play Area (Middle) --- */
         #play-area {
@@ -146,17 +169,18 @@
 
         #jokers-container {
             display: flex;
-            gap: 5px;
+            gap: 8px;
             margin-bottom: 10px;
-            height: 60px;
+            height: 70px;
+            align-items: center;
         }
 
         .joker-card {
-            width: 40px;
-            height: 56px;
+            width: 45px;
+            height: 64px;
             background: linear-gradient(135deg, #222, #444);
             border: 2px solid var(--gold);
-            border-radius: 4px;
+            border-radius: 6px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -164,21 +188,43 @@
             color: var(--gold);
             position: relative;
             cursor: help;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+        
+        .joker-card.active {
+            animation: jokerTrigger 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.27);
+            z-index: 100;
+            border-color: #fff;
+            background: linear-gradient(135deg, #444, #666);
+        }
+
+        @keyframes jokerTrigger {
+            0% { transform: scale(1) rotate(0deg); box-shadow: 0 0 0 var(--gold); }
+            25% { transform: scale(1.4) rotate(-10deg); box-shadow: 0 0 20px var(--gold), 0 0 40px var(--accent); }
+            50% { transform: scale(1.4) rotate(10deg); }
+            100% { transform: scale(1) rotate(0deg); box-shadow: 0 0 0 var(--gold); }
         }
         
         .joker-tooltip {
             position: absolute;
-            bottom: -40px;
+            bottom: -45px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            padding: 5px;
+            background: rgba(0,0,0,0.95);
+            padding: 8px;
             font-size: 0.7rem;
             white-space: nowrap;
             border-radius: 4px;
             pointer-events: none;
-            z-index: 100;
+            z-index: 200;
             display: none;
+            border: 1px solid var(--gold);
+        }
+        
+        /* Show tooltip on hover/touch */
+        .joker-card:hover .joker-tooltip, .joker-card:active .joker-tooltip {
+            display: block;
         }
 
         /* --- Hand Area (Bottom) --- */
@@ -217,10 +263,11 @@
             padding: 5px;
             font-weight: bold;
             position: relative;
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.27), margin 0.2s;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.27), margin 0.2s, opacity 0.2s;
             cursor: pointer;
             font-size: clamp(12px, 3vw, 20px);
             border: 1px solid #999;
+            backface-visibility: hidden;
         }
 
         /* Card Dealing Animation */
@@ -236,8 +283,34 @@
         }
 
         .card.deal-anim {
-            animation: flyIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation: flyIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             opacity: 0; /* Start hidden */
+        }
+
+        /* Play Animation (Shooting Up) */
+        @keyframes shootUp {
+            0% { transform: translateY(-25px) scale(1); opacity: 1; box-shadow: 0 0 10px var(--accent); }
+            50% { transform: translateY(-150px) scale(1.1) rotate(5deg); opacity: 1; }
+            100% { transform: translateY(-600px) scale(0.5) rotate(20deg); opacity: 0; }
+        }
+        
+        .card.playing {
+            animation: shootUp 0.6s ease-in forwards !important;
+            z-index: 100;
+            border-color: var(--accent);
+        }
+
+        /* Discard Animation (Dropping Down) */
+        @keyframes dropDown {
+            0% { transform: translateY(-25px); opacity: 1; }
+            30% { transform: translateY(10px) rotate(-5deg); }
+            100% { transform: translateY(400px) rotate(15deg); opacity: 0; }
+        }
+
+        .card.discarding {
+            animation: dropDown 0.5s ease-in forwards !important;
+            z-index: 50;
+            filter: grayscale(100%);
         }
 
         .card.selected {
@@ -245,6 +318,7 @@
             border: 2px solid var(--accent);
             z-index: 10;
             margin: 0 2px; /* Spread out when selected */
+            box-shadow: 0 0 10px var(--accent);
         }
 
         .card.red { color: #d00; }
@@ -310,7 +384,7 @@
 
         @keyframes floatUp {
             0% { transform: translateY(0) scale(1); opacity: 1; }
-            100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
         }
 
         /* --- Full Screen Overlays --- */
@@ -395,6 +469,7 @@
             margin-top: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--gold);
         }
 
     </style>
@@ -578,7 +653,6 @@ const initBackground = () => {
     }
     animate();
 };
-// Start background animation
 initBackground();
 
 
@@ -586,7 +660,6 @@ initBackground();
  * CORE GAME ENGINE
  */
 
-// Constants
 const SUITS = ['♠', '♥', '♣', '♦'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const RANK_VALUES = {
@@ -594,7 +667,6 @@ const RANK_VALUES = {
     'J': 11, 'Q': 12, 'K': 13, 'A': 14
 };
 
-// Base Scores (Balatro style: Chips, Mult)
 const HAND_SCORES = {
     'High Card': [5, 1],
     'Pair': [10, 2],
@@ -608,7 +680,6 @@ const HAND_SCORES = {
     'Royal Flush': [100, 8]
 };
 
-// Joker Database
 const JOKER_DB = [
     { id: 'j_joker', name: 'Joker', desc: '+4 Mult', cost: 2, type: 'mult', val: 4 },
     { id: 'j_greedy', name: 'Greedy', desc: '+15 Chips', cost: 3, type: 'chips', val: 15 },
@@ -626,12 +697,11 @@ class Card {
         this.value = RANK_VALUES[rank];
         this.id = Math.random().toString(36).substr(2, 9);
         this.selected = false;
-        this.justDrawn = false; // Flag for animation
+        this.justDrawn = false;
     }
 
     getHTML(index = 0) {
         const isRed = this.suit === '♥' || this.suit === '♦';
-        // Add animation class and stagger delay based on index if just drawn
         const animClass = this.justDrawn ? 'deal-anim' : '';
         const animStyle = this.justDrawn ? `animation-delay: ${index * 0.08}s` : '';
         
@@ -652,16 +722,12 @@ class Game {
         this.deck = [];
         this.hand = [];
         this.jokers = [];
-        
         this.money = 4;
         this.round = 1;
-        
         this.handsLeft = 4;
         this.discardsLeft = 3;
-        
         this.currentScore = 0;
         this.targetScore = 300;
-        
         this.handLimit = 8;
         
         this.initDeck();
@@ -696,7 +762,6 @@ class Game {
     }
 
     drawCards(count) {
-        // Draw cards and mark them as 'new' for animation
         const newCards = [];
         for (let i = 0; i < count; i++) {
             if (this.deck.length > 0) {
@@ -710,7 +775,6 @@ class Game {
         this.sortHand();
         this.renderHand();
 
-        // Remove the animation flag after animation completes so re-renders (selections) don't re-animate
         setTimeout(() => {
             newCards.forEach(c => c.justDrawn = false);
         }, 1000);
@@ -725,7 +789,7 @@ class Game {
         if (card) {
             card.selected = !card.selected;
             this.renderHand();
-            this.previewScore(); // Check what hand is selected
+            this.previewScore();
         }
     }
 
@@ -733,7 +797,7 @@ class Game {
         return this.hand.filter(c => c.selected);
     }
 
-    discardCards() {
+    async discardCards() {
         const selected = this.getSelectedCards();
         if (selected.length === 0 || selected.length > 5) {
             this.showFloatText("Select 1-5 cards", "#play-area");
@@ -744,11 +808,17 @@ class Game {
             return;
         }
 
-        // Remove selected
+        // --- ANIMATION START ---
+        // Select the actual DOM elements to animate
+        const domCards = document.querySelectorAll('.card.selected');
+        domCards.forEach(el => el.classList.add('discarding'));
+        
+        // Wait for animation duration (matches CSS time)
+        await new Promise(r => setTimeout(r, 500));
+        // --- ANIMATION END ---
+
         this.hand = this.hand.filter(c => !c.selected);
         this.discardsLeft--;
-        
-        // Draw new
         this.drawCards(selected.length);
         this.updateUI();
         document.getElementById('hand-type-display').innerText = "";
@@ -773,14 +843,11 @@ class Game {
     }
 
     evaluateHand(cards) {
-        // Sort for evaluation
         const sorted = [...cards].sort((a, b) => a.value - b.value);
         const values = sorted.map(c => c.value);
         const suits = sorted.map(c => c.suit);
         
-        // Fix: Requires strictly 5 cards for Flush, Straight, Straight Flush
         const isFlush = cards.length === 5 && suits.every(s => s === suits[0]);
-        
         let isStraight = false;
         
         if (cards.length === 5) {
@@ -788,13 +855,11 @@ class Game {
             for (let i = 0; i < values.length - 1; i++) {
                 if (values[i+1] !== values[i] + 1) isStraight = false;
             }
-            // Wheel Straight (A, 2, 3, 4, 5) -> Values 14, 2, 3, 4, 5
             if (!isStraight && values[0]===2 && values[1]===3 && values[2]===4 && values[3]===5 && values[4]===14) {
                 isStraight = true;
             }
         }
 
-        // Count duplicates
         const counts = {};
         values.forEach(v => counts[v] = (counts[v] || 0) + 1);
         const countsArr = Object.values(counts).sort((a, b) => b - a);
@@ -822,8 +887,7 @@ class Game {
         return { 
             type: type, 
             chips: HAND_SCORES[type][0], 
-            mult: HAND_SCORES[type][1],
-            scoringCards: sorted 
+            mult: HAND_SCORES[type][1]
         };
     }
 
@@ -831,8 +895,14 @@ class Game {
         const selected = this.getSelectedCards();
         if (this.handsLeft <= 0) return;
 
-        // Disable UI
         document.getElementById('play-btn').disabled = true;
+        
+        // --- ANIMATION: PLAY CARDS ---
+        const domCards = document.querySelectorAll('.card.selected');
+        domCards.forEach(el => el.classList.add('playing'));
+        
+        // Wait for card "shoot up" animation
+        await new Promise(r => setTimeout(r, 600));
         
         const result = this.evaluateHand(selected);
         
@@ -840,20 +910,20 @@ class Game {
         let chips = result.chips;
         let mult = result.mult;
 
-        // Add Card Chips (Balatro logic: Chips from cards + Base)
+        // Add Card Chips
         let cardChips = 0;
         selected.forEach(c => {
             let val = c.value;
-            if(val == 14) val = 11; // Aces 11
-            if(val > 10 && val < 14) val = 10; // Face 10
+            if(val == 14) val = 11; 
+            if(val > 10 && val < 14) val = 10; 
             cardChips += val;
         });
         chips += cardChips;
 
         // 2. Display Initial
-        this.animateScoreCalc(chips, mult);
+        this.updateScoreDisplay(chips, mult, true);
 
-        // 3. Joker Effects (Simulated Delay)
+        // 3. Joker Effects
         await new Promise(r => setTimeout(r, 400));
         
         for(let joker of this.jokers) {
@@ -864,9 +934,9 @@ class Game {
             if (joker.type === 'cond_chips' && joker.cond === result.type) { chips += joker.val; triggered = true; }
 
             if(triggered) {
-                this.highlightJoker(joker.id);
-                this.animateScoreCalc(chips, mult);
-                await new Promise(r => setTimeout(r, 300));
+                this.highlightJoker(joker.uniqueId);
+                this.updateScoreDisplay(chips, mult, true); // true triggers bump anim
+                await new Promise(r => setTimeout(r, 500));
             }
         }
 
@@ -875,15 +945,13 @@ class Game {
         this.currentScore += handScore;
         this.handsLeft--;
 
-        // Cleanup
-        this.hand = this.hand.filter(c => !c.selected); // Remove played cards
-        this.drawCards(selected.length); // Refill hand
+        this.hand = this.hand.filter(c => !c.selected);
+        this.drawCards(selected.length);
         
         this.updateUI();
         document.getElementById('calc-display').style.opacity = 0;
         this.showFloatText(`+${handScore}`, "#current-score");
 
-        // Check Win/Loss/Continue
         if (this.currentScore >= this.targetScore) {
             setTimeout(() => this.winRound(), 1000);
         } else if (this.handsLeft === 0) {
@@ -893,31 +961,53 @@ class Game {
         document.getElementById('hand-type-display').innerText = "";
     }
 
-    animateScoreCalc(chips, mult) {
+    // New method to handle score bumps
+    updateScoreDisplay(chips, mult, animate = false) {
         const disp = document.getElementById('calc-display');
+        const cEl = document.getElementById('base-chips');
+        const mEl = document.getElementById('base-mult');
+        
         disp.style.opacity = 1;
-        document.getElementById('base-chips').innerText = Math.floor(chips);
-        document.getElementById('base-mult').innerText = Math.floor(mult);
-        // Simple pulse
-        disp.style.transform = "scale(1.2)";
-        setTimeout(() => disp.style.transform = "scale(1)", 100);
+        cEl.innerText = Math.floor(chips);
+        mEl.innerText = Math.floor(mult);
+        
+        if(animate) {
+            cEl.parentElement.classList.remove('bump-val');
+            mEl.parentElement.classList.remove('bump-val');
+            // Trigger reflow
+            void cEl.offsetWidth; 
+            
+            cEl.parentElement.classList.add('bump-val');
+            mEl.parentElement.classList.add('bump-val');
+        }
     }
     
-    highlightJoker(id) {
-        // Visual feedback for joker triggering
-        const jokers = document.getElementById('jokers-container').children;
+    highlightJoker(uniqueId) {
+        // Find specific joker DOM element by unique ID
+        const el = document.getElementById(`joker-${uniqueId}`);
+        if (el) {
+            el.classList.remove('active');
+            void el.offsetWidth;
+            el.classList.add('active');
+        }
     }
 
     winRound() {
-        // Add money based on leftover hands/discards (Simple logic)
         const interest = 1 + this.handsLeft; 
-        this.money += interest + 3; // Base reward
-        
+        const bonus = interest + 3;
+        this.money += bonus;
+        this.animateMoney(); // Visual feedback for money
         this.openShop();
+    }
+    
+    animateMoney() {
+        const el = document.getElementById('money-val');
+        el.parentElement.classList.remove('money-pulse');
+        void el.offsetWidth;
+        el.parentElement.classList.add('money-pulse');
     }
 
     gameOver() {
-        // Show Game Over Overlay instead of Alert
         const overlay = document.getElementById('game-over-overlay');
         document.getElementById('go-round').innerText = this.round;
         document.getElementById('go-score').innerText = this.currentScore;
@@ -930,8 +1020,6 @@ class Game {
         document.getElementById('shop-money').innerText = this.money;
         
         container.innerHTML = '';
-        
-        // Generate 3 random shop items
         for(let i=0; i<3; i++) {
             const item = JOKER_DB[Math.floor(Math.random() * JOKER_DB.length)];
             const div = document.createElement('div');
@@ -955,11 +1043,12 @@ class Game {
                 return;
             }
             this.money -= cost;
+            this.animateMoney();
             document.getElementById('shop-money').innerText = this.money;
             
             const template = JOKER_DB.find(j => j.id === id);
-            // Clone to allow duplicates
-            this.jokers.push({...template, uniqueId: Math.random()});
+            // Add uniqueId here so we can animate specific jokers later
+            this.jokers.push({...template, uniqueId: Math.random().toString(36).substr(2, 9)});
             
             btnElement.innerText = "SOLD";
             btnElement.disabled = true;
@@ -976,21 +1065,19 @@ class Game {
     nextRoundFromShop() {
         document.getElementById('shop-overlay').style.display = 'none';
         this.round++;
-        // Increase difficulty
         this.targetScore = Math.floor(this.targetScore * 1.5) + 100;
         this.startRound();
     }
 
     renderHand() {
         const container = document.getElementById('cards-container');
-        // Pass index for animation staggering
         container.innerHTML = this.hand.map((c, index) => c.getHTML(index)).join('');
     }
 
     renderJokers() {
         const container = document.getElementById('jokers-container');
         container.innerHTML = this.jokers.map(j => `
-            <div class="joker-card" title="${j.desc}">
+            <div id="joker-${j.uniqueId}" class="joker-card" title="${j.desc}">
                 J
                 <div class="joker-tooltip">${j.name}: ${j.desc}</div>
             </div>
@@ -1025,17 +1112,11 @@ class Game {
     }
 }
 
-// Initialize Game
 const game = new Game();
 
-// Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, err => {
-            console.log('ServiceWorker registration failed: ', err);
-        });
+        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
     });
 }
 </script>
