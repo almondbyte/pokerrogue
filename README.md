@@ -1,2 +1,8 @@
+mom: we have balatro at home.
+
+the balatro at home:
+
 https://almondbyte.github.io/pokerrogue/
-mom: we have balatro at home. The balatro at home:
+
+
+![alt-text](https://raw.githubusercontent.com/almondbyte/pokerrogue/refs/heads/main/icon-192.png)
