@@ -584,10 +584,6 @@
 
 
 <script>
-window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault(); // Stop the install prompt from appearing
-});
-
 /**
  * BACKGROUND ANIMATION ENGINE (WebGL)
  */
@@ -1155,6 +1151,14 @@ if ('serviceWorker' in navigator) {
     });
 }
 </script>
+
+<script>
+// Disable PWA install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+});
+</script>
+
 </body>
 </html>
 
