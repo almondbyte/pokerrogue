@@ -924,21 +924,52 @@ class Game {
         this.updateScoreDisplay(chips, mult, true);
 
         // 3. Joker Effects
-        await new Promise(r => setTimeout(r, 400));
-        
-        for(let joker of this.jokers) {
-            let triggered = false;
-            if (joker.type === 'mult') { mult += joker.val; triggered = true; }
-            if (joker.type === 'chips') { chips += joker.val; triggered = true; }
-            if (joker.type === 'cond_mult' && joker.cond === result.type) { mult *= joker.val; triggered = true; }
-            if (joker.type === 'cond_chips' && joker.cond === result.type) { chips += joker.val; triggered = true; }
+await new Promise(r => setTimeout(r, 400));
 
-            if(triggered) {
-                this.highlightJoker(joker.uniqueId);
-                this.updateScoreDisplay(chips, mult, true); // true triggers bump anim
-                await new Promise(r => setTimeout(r, 500));
-            }
+// Build rank counts for conditional jokers
+const rankCounts = {};
+selected.forEach(c => {
+    rankCounts[c.value] = (rankCounts[c.value] || 0) + 1;
+});
+
+for (let joker of this.jokers) {
+    let triggered = false;
+
+    if (joker.type === 'mult') { 
+        mult += joker.val; 
+        triggered = true; 
+    }
+
+    if (joker.type === 'chips') { 
+        chips += joker.val; 
+        triggered = true; 
+    }
+
+    if (joker.type === 'cond_mult' && joker.cond === 'Pair') {
+        if (Object.values(rankCounts).some(v => v >= 2)) {
+            mult *= joker.val;
+            triggered = true;
         }
+    }
+
+    if (joker.type === 'cond_mult' && joker.cond === 'Three of a Kind') {
+        if (Object.values(rankCounts).some(v => v >= 3)) {
+            mult *= joker.val;
+            triggered = true;
+        }
+    }
+
+    if (joker.type === 'cond_chips' && joker.cond === result.type) {
+        chips += joker.val;
+        triggered = true;
+    }
+
+    if (triggered) {
+        this.highlightJoker(joker.uniqueId);
+        this.updateScoreDisplay(chips, mult, true);
+        await new Promise(r => setTimeout(r, 500));
+    }
+}
 
         // 4. Final Score
         const handScore = chips * mult;
