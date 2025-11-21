@@ -584,6 +584,10 @@
 
 
 <script>
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); // Stop the install prompt from appearing
+});
+
 /**
  * BACKGROUND ANIMATION ENGINE (WebGL)
  */
