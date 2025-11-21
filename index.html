@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Poker Rogue</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f3460">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PokerRogue">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        :root {
+            /* Made base bg semi-transparent for the psychedelic canvas */
+            --bg-color: rgba(26, 26, 46, 0.85); 
+            --card-bg: #e0e0e0;
+            --felt-color: rgba(22, 33, 62, 0.9); /* Slightly transparent felt */
+            --accent: #e94560;
+            --text-light: #f0f0f0;
+            --gold: #ffd700;
+            --blue: #0f3460;
+            --mult-color: #ff2e63;
+            --chip-color: #00adb5;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            /* Safe area for iPhone notch */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* --- Psychedelic Background Canvas --- */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2; /* Behind everything */
+            pointer-events: none;
+        }
+
+        /* CRT Effect Overlay */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.7;
+        }
+
+        /* --- HUD Area (Top) --- */
+        #hud {
+            height: 25%;
+            background-color: var(--blue);
+            border-bottom: 2px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            justify-content: space-between;
+            position: relative;
+            z-index: 10;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .score-container {
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .score-main {
+            font-size: 1.8rem;
+            color: var(--text-light);
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        .score-target {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .chip-mult-display {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.2rem;
+            margin-top: 5px;
+            opacity: 0; /* Hidden until calc */
+            transition: opacity 0.3s;
+        }
+
+        .chips-val { color: var(--chip-color); }
+        .mult-val { color: var(--mult-color); }
+
+        /* --- Play Area (Middle) --- */
+        #play-area {
+            flex-grow: 1;
+            background-color: var(--felt-color);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding-top: 20px;
+            overflow: hidden;
+            /* Backdrop filter to blur the psych background slightly under the play area */
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        #jokers-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+            height: 60px;
+        }
+
+        .joker-card {
+            width: 40px;
+            height: 56px;
+            background: linear-gradient(135deg, #222, #444);
+            border: 2px solid var(--gold);
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            color: var(--gold);
+            position: relative;
+            cursor: help;
+        }
+        
+        .joker-tooltip {
+            position: absolute;
+            bottom: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 5px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        /* --- Hand Area (Bottom) --- */
+        #hand-area {
+            height: 35%;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-bottom: 10px;
+            position: relative;
+            z-index: 20;
+        }
+
+        #cards-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 100%;
+            padding: 0 10px;
+            margin-bottom: 15px;
+            perspective: 1000px;
+        }
+
+        .card {
+            width: 14vw;
+            max-width: 70px;
+            aspect-ratio: 2.5/3.5;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            margin: 0 -1.5vw; /* Overlap */
+            box-shadow: -2px 2px 5px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px;
+            font-weight: bold;
+            position: relative;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.27), margin 0.2s;
+            cursor: pointer;
+            font-size: clamp(12px, 3vw, 20px);
+            border: 1px solid #999;
+        }
+
+        /* Card Dealing Animation */
+        @keyframes flyIn {
+            0% { 
+                transform: translate(100vw, 100vh) rotate(45deg) scale(0.5);
+                opacity: 0;
+            }
+            100% { 
+                transform: translate(0, 0) rotate(0deg) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .card.deal-anim {
+            animation: flyIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0; /* Start hidden */
+        }
+
+        .card.selected {
+            transform: translateY(-25px);
+            border: 2px solid var(--accent);
+            z-index: 10;
+            margin: 0 2px; /* Spread out when selected */
+        }
+
+        .card.red { color: #d00; }
+        .card.black { color: #111; }
+
+        .card-suit-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            opacity: 0.2;
+        }
+
+        /* --- Controls --- */
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); /* Safe area */
+            background: #0a0a0a;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: filter 0.2s, transform 0.1s;
+            color: white;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .btn-play { background-color: var(--accent); }
+        .btn-discard { background-color: var(--blue); }
+        .btn-sort { background-color: #555; }
+
+        .btn:disabled {
+            filter: grayscale(100%);
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- Feedback / Popups --- */
+        .floater {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            animation: floatUp 1s forwards;
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.8);
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+        }
+
+        /* --- Full Screen Overlays --- */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 500;
+            display: none; /* flex when active */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .overlay-title {
+            font-size: 3rem;
+            color: var(--gold);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--accent);
+            border-bottom: 2px solid var(--gold);
+            text-align: center;
+        }
+
+        /* Shop Specific */
+        .shop-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: auto;
+        }
+
+        .shop-item {
+            background: #333;
+            padding: 15px;
+            border-radius: 10px;
+            width: 45%;
+            max-width: 150px;
+            text-align: center;
+            border: 1px solid #555;
+        }
+
+        .shop-price {
+            color: var(--gold);
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        .shop-buy-btn {
+            background: var(--gold);
+            color: #000;
+            border: none;
+            padding: 5px 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        /* Game Over Specific */
+        .game-over-stat {
+            font-size: 1.5rem;
+            margin: 10px 0;
+            color: var(--text-light);
+        }
+        
+        .btn-restart {
+            background-color: var(--chip-color);
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            margin-top: 30px;
+        }
+        
+        /* Hand Evaluator Type Display */
+        #hand-type-display {
+            font-size: 1.2rem;
+            color: var(--gold);
+            font-weight: bold;
+            height: 30px;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Psychedelic Background Canvas -->
+    <canvas id="bg-canvas"></canvas>
+    <div class="scanlines"></div>
+
+    <!-- TOP HUD -->
+    <div id="hud">
+        <div class="stat-row">
+            <span style="color: var(--gold);">Money: $<span id="money-val">0</span></span>
+            <span>Round: <span id="round-val">1</span></span>
+        </div>
+        <div class="stat-row" style="font-size: 0.9rem; margin-top:5px;">
+            <span style="color: #ff6b6b;">Hands: <span id="hands-left">4</span></span>
+            <span style="color: #54a0ff;">Discards: <span id="discards-left">3</span></span>
+        </div>
+
+        <div class="score-container">
+            <div class="score-target">Target: <span id="target-score">300</span></div>
+            <div class="score-main" id="current-score">0</div>
+        </div>
+    </div>
+
+    <!-- PLAY AREA -->
+    <div id="play-area">
+        <div id="jokers-container">
+            <!-- Jokers go here -->
+        </div>
+
+        <div id="hand-type-display"></div>
+        
+        <div class="chip-mult-display" id="calc-display">
+            <span class="chips-val"><span id="base-chips">0</span></span>
+            <span style="color:white;">X</span>
+            <span class="mult-val"><span id="base-mult">0</span></span>
+        </div>
+    </div>
+
+    <!-- HAND AREA -->
+    <div id="hand-area">
+        <div id="cards-container">
+            <!-- Cards In Hand -->
+        </div>
+        <div id="controls">
+            <button class="btn btn-play" id="play-btn" onclick="game.playHand()">PLAY</button>
+            <button class="btn btn-discard" id="discard-btn" onclick="game.discardCards()">DISCARD</button>
+        </div>
+    </div>
+
+    <!-- SHOP OVERLAY -->
+    <div id="shop-overlay" class="overlay">
+        <div class="overlay-title" style="font-size: 2rem;">SHOP</div>
+        <div style="color:white; margin-bottom:10px;">Money: $<span id="shop-money">0</span></div>
+        <div class="shop-items" id="shop-items-container">
+            <!-- Generated Items -->
+        </div>
+        <button class="btn" style="margin-top: 20px; background: var(--accent); width: 80%;" onclick="game.nextRoundFromShop()">NEXT ROUND</button>
+    </div>
+
+    <!-- GAME OVER OVERLAY -->
+    <div id="game-over-overlay" class="overlay">
+        <div class="overlay-title" style="color: #ff4757;">GAME OVER</div>
+        <div class="game-over-stat">Round: <span id="go-round">1</span></div>
+        <div class="game-over-stat">Score: <span id="go-score">0</span></div>
+        <button class="btn btn-restart" onclick="location.reload()">TRY AGAIN</button>
+    </div>
+
+<!-- Vertex Shader (Simple pass-through) -->
+<script id="vs" type="x-shader/x-vertex">
+    attribute vec4 a_position;
+    void main() {
+        gl_Position = a_position;
+    }
+</script>
+
+<!-- Fragment Shader (Psychedelic Plasma) -->
+<script id="fs" type="x-shader/x-fragment">
+    precision mediump float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+
+    void main() {
+        vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+        
+        // Create warped coordinates based on time and position
+        float v1 = sin(uv.x * 5.0 + u_time * 0.5);
+        float v2 = cos(uv.y * 5.0 - u_time * 0.3);
+        float v3 = sin((uv.x + uv.y) * 4.0 + u_time * 0.2);
+
+        // Warping effect
+        float warpedX = uv.x + sin(uv.y * 10.0 + u_time) * 0.1;
+        float warpedY = uv.y + cos(uv.x * 10.0 + u_time) * 0.1;
+        
+        // Generate colors based on warped coordinates and time
+        // Using game's neon palette tones: pink/red, cyan/blue, gold/purple
+        float r = sin(warpedX * 6.0 + u_time + v1) * 0.5 + 0.5;
+        float g = cos(warpedY * 7.0 - u_time + v2) * 0.5 + 0.5;
+        float b = sin((warpedX + warpedY) * 8.0 + u_time + v3) * 0.5 + 0.5;
+
+        // Emphasize the neon pink/cyan aspects
+        vec3 color = vec3(r*0.8 + 0.2, g*0.5, b*0.8 + 0.2);
+        
+        // Mix with a dark base to keep it moody and not too bright
+        vec3 finalColor = mix(vec3(0.05, 0.02, 0.1), color, 0.5);
+
+        gl_FragColor = vec4(finalColor, 1.0);
+    }
+</script>
+
+
+<script>
+/**
+ * BACKGROUND ANIMATION ENGINE (WebGL)
+ */
+const initBackground = () => {
+    const canvas = document.getElementById("bg-canvas");
+    const gl = canvas.getContext("webgl");
+    if (!gl) return;
+
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    const vsSource = document.getElementById("vs").text;
+    const fsSource = document.getElementById("fs").text;
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return;
+    }
+
+    const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+    const timeUniformLocation = gl.getUniformLocation(program, "u_time");
+    const resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    // Two triangles covering the screen
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,  1, -1, -1,  1,
+        -1,  1,  1, -1,  1,  1,
+    ]), gl.STATIC_DRAW);
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+
+    let startTime = Date.now();
+    function animate() {
+        const currentTime = (Date.now() - startTime) / 1000; // Time in seconds
+        gl.uniform1f(timeUniformLocation, currentTime);
+        gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(animate);
+    }
+    animate();
+};
+// Start background animation
+initBackground();
+
+
+/**
+ * CORE GAME ENGINE
+ */
+
+// Constants
+const SUITS = ['♠', '♥', '♣', '♦'];
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const RANK_VALUES = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+    'J': 11, 'Q': 12, 'K': 13, 'A': 14
+};
+
+// Base Scores (Balatro style: Chips, Mult)
+const HAND_SCORES = {
+    'High Card': [5, 1],
+    'Pair': [10, 2],
+    'Two Pair': [20, 2],
+    'Three of a Kind': [30, 3],
+    'Straight': [30, 4],
+    'Flush': [35, 4],
+    'Full House': [40, 4],
+    'Four of a Kind': [60, 7],
+    'Straight Flush': [100, 8],
+    'Royal Flush': [100, 8]
+};
+
+// Joker Database
+const JOKER_DB = [
+    { id: 'j_joker', name: 'Joker', desc: '+4 Mult', cost: 2, type: 'mult', val: 4 },
+    { id: 'j_greedy', name: 'Greedy', desc: '+15 Chips', cost: 3, type: 'chips', val: 15 },
+    { id: 'j_duo', name: 'The Duo', desc: 'x2 Mult if Pair', cost: 5, type: 'cond_mult', cond: 'Pair', val: 2 },
+    { id: 'j_suit', name: 'Suit Up', desc: '+30 Chips if Flush', cost: 4, type: 'cond_chips', cond: 'Flush', val: 30 },
+    { id: 'j_trio', name: 'The Trio', desc: 'x3 Mult if 3 of a Kind', cost: 6, type: 'cond_mult', cond: 'Three of a Kind', val: 3 },
+    { id: 'j_rich', name: 'Business', desc: 'Earn $1 per discard left', cost: 5, type: 'passive' },
+    { id: 'j_mad', name: 'Madness', desc: '+10 Mult', cost: 6, type: 'mult', val: 10 }
+];
+
+class Card {
+    constructor(rank, suit) {
+        this.rank = rank;
+        this.suit = suit;
+        this.value = RANK_VALUES[rank];
+        this.id = Math.random().toString(36).substr(2, 9);
+        this.selected = false;
+        this.justDrawn = false; // Flag for animation
+    }
+
+    getHTML(index = 0) {
+        const isRed = this.suit === '♥' || this.suit === '♦';
+        // Add animation class and stagger delay based on index if just drawn
+        const animClass = this.justDrawn ? 'deal-anim' : '';
+        const animStyle = this.justDrawn ? `animation-delay: ${index * 0.08}s` : '';
+        
+        return `
+            <div class="card ${isRed ? 'red' : 'black'} ${this.selected ? 'selected' : ''} ${animClass}" 
+                 style="${animStyle}"
+                 data-id="${this.id}" onclick="game.toggleCard('${this.id}')">
+                <div style="text-align:left;">${this.rank}<br>${this.suit}</div>
+                <div class="card-suit-center">${this.suit}</div>
+                <div style="text-align:right; transform: rotate(180deg);">${this.rank}<br>${this.suit}</div>
+            </div>
+        `;
+    }
+}
+
+class Game {
+    constructor() {
+        this.deck = [];
+        this.hand = [];
+        this.jokers = [];
+        
+        this.money = 4;
+        this.round = 1;
+        
+        this.handsLeft = 4;
+        this.discardsLeft = 3;
+        
+        this.currentScore = 0;
+        this.targetScore = 300;
+        
+        this.handLimit = 8;
+        
+        this.initDeck();
+        this.startRound();
+    }
+
+    initDeck() {
+        this.deck = [];
+        for (let s of SUITS) {
+            for (let r of RANKS) {
+                this.deck.push(new Card(r, s));
+            }
+        }
+    }
+
+    shuffle() {
+        for (let i = this.deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
+        }
+    }
+
+    startRound() {
+        this.initDeck();
+        this.shuffle();
+        this.hand = [];
+        this.drawCards(this.handLimit);
+        this.currentScore = 0;
+        this.handsLeft = 4;
+        this.discardsLeft = 3;
+        this.updateUI();
+    }
+
+    drawCards(count) {
+        // Draw cards and mark them as 'new' for animation
+        const newCards = [];
+        for (let i = 0; i < count; i++) {
+            if (this.deck.length > 0) {
+                const card = this.deck.pop();
+                card.justDrawn = true;
+                this.hand.push(card);
+                newCards.push(card);
+            }
+        }
+        
+        this.sortHand();
+        this.renderHand();
+
+        // Remove the animation flag after animation completes so re-renders (selections) don't re-animate
+        setTimeout(() => {
+            newCards.forEach(c => c.justDrawn = false);
+        }, 1000);
+    }
+
+    sortHand() {
+        this.hand.sort((a, b) => a.value - b.value);
+    }
+
+    toggleCard(id) {
+        const card = this.hand.find(c => c.id === id);
+        if (card) {
+            card.selected = !card.selected;
+            this.renderHand();
+            this.previewScore(); // Check what hand is selected
+        }
+    }
+
+    getSelectedCards() {
+        return this.hand.filter(c => c.selected);
+    }
+
+    discardCards() {
+        const selected = this.getSelectedCards();
+        if (selected.length === 0 || selected.length > 5) {
+            this.showFloatText("Select 1-5 cards", "#play-area");
+            return;
+        }
+        if (this.discardsLeft <= 0) {
+            this.showFloatText("No Discards!", "#discard-btn");
+            return;
+        }
+
+        // Remove selected
+        this.hand = this.hand.filter(c => !c.selected);
+        this.discardsLeft--;
+        
+        // Draw new
+        this.drawCards(selected.length);
+        this.updateUI();
+        document.getElementById('hand-type-display').innerText = "";
+    }
+
+    previewScore() {
+        const selected = this.getSelectedCards();
+        const typeEl = document.getElementById('hand-type-display');
+        const btn = document.getElementById('play-btn');
+        const discBtn = document.getElementById('discard-btn');
+
+        if (selected.length > 0 && selected.length <= 5) {
+            const evalResult = this.evaluateHand(selected);
+            typeEl.innerText = evalResult.type;
+            btn.disabled = false;
+            discBtn.disabled = false;
+        } else {
+            typeEl.innerText = selected.length > 5 ? "Too Many Cards" : "";
+            btn.disabled = true;
+            discBtn.disabled = (selected.length === 0);
+        }
+    }
+
+    evaluateHand(cards) {
+        // Sort for evaluation
+        const sorted = [...cards].sort((a, b) => a.value - b.value);
+        const values = sorted.map(c => c.value);
+        const suits = sorted.map(c => c.suit);
+        
+        // Fix: Requires strictly 5 cards for Flush, Straight, Straight Flush
+        const isFlush = cards.length === 5 && suits.every(s => s === suits[0]);
+        
+        let isStraight = false;
+        
+        if (cards.length === 5) {
+            isStraight = true;
+            for (let i = 0; i < values.length - 1; i++) {
+                if (values[i+1] !== values[i] + 1) isStraight = false;
+            }
+            // Wheel Straight (A, 2, 3, 4, 5) -> Values 14, 2, 3, 4, 5
+            if (!isStraight && values[0]===2 && values[1]===3 && values[2]===4 && values[3]===5 && values[4]===14) {
+                isStraight = true;
+            }
+        }
+
+        // Count duplicates
+        const counts = {};
+        values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        const countsArr = Object.values(counts).sort((a, b) => b - a);
+
+        let type = "High Card";
+        
+        if (isFlush && isStraight) {
+            type = (values[0] === 10 || (values.includes(14) && values.includes(13))) ? "Royal Flush" : "Straight Flush";
+        } else if (countsArr[0] === 4) {
+            type = "Four of a Kind";
+        } else if (countsArr[0] === 3 && countsArr[1] === 2) {
+            type = "Full House";
+        } else if (isFlush) {
+            type = "Flush";
+        } else if (isStraight) {
+            type = "Straight";
+        } else if (countsArr[0] === 3) {
+            type = "Three of a Kind";
+        } else if (countsArr[0] === 2 && countsArr[1] === 2) {
+            type = "Two Pair";
+        } else if (countsArr[0] === 2) {
+            type = "Pair";
+        }
+
+        return { 
+            type: type, 
+            chips: HAND_SCORES[type][0], 
+            mult: HAND_SCORES[type][1],
+            scoringCards: sorted 
+        };
+    }
+
+    async playHand() {
+        const selected = this.getSelectedCards();
+        if (this.handsLeft <= 0) return;
+
+        // Disable UI
+        document.getElementById('play-btn').disabled = true;
+        
+        const result = this.evaluateHand(selected);
+        
+        // 1. Base Calculation
+        let chips = result.chips;
+        let mult = result.mult;
+
+        // Add Card Chips (Balatro logic: Chips from cards + Base)
+        let cardChips = 0;
+        selected.forEach(c => {
+            let val = c.value;
+            if(val == 14) val = 11; // Aces 11
+            if(val > 10 && val < 14) val = 10; // Face 10
+            cardChips += val;
+        });
+        chips += cardChips;
+
+        // 2. Display Initial
+        this.animateScoreCalc(chips, mult);
+
+        // 3. Joker Effects (Simulated Delay)
+        await new Promise(r => setTimeout(r, 400));
+        
+        for(let joker of this.jokers) {
+            let triggered = false;
+            if (joker.type === 'mult') { mult += joker.val; triggered = true; }
+            if (joker.type === 'chips') { chips += joker.val; triggered = true; }
+            if (joker.type === 'cond_mult' && joker.cond === result.type) { mult *= joker.val; triggered = true; }
+            if (joker.type === 'cond_chips' && joker.cond === result.type) { chips += joker.val; triggered = true; }
+
+            if(triggered) {
+                this.highlightJoker(joker.id);
+                this.animateScoreCalc(chips, mult);
+                await new Promise(r => setTimeout(r, 300));
+            }
+        }
+
+        // 4. Final Score
+        const handScore = chips * mult;
+        this.currentScore += handScore;
+        this.handsLeft--;
+
+        // Cleanup
+        this.hand = this.hand.filter(c => !c.selected); // Remove played cards
+        this.drawCards(selected.length); // Refill hand
+        
+        this.updateUI();
+        document.getElementById('calc-display').style.opacity = 0;
+        this.showFloatText(`+${handScore}`, "#current-score");
+
+        // Check Win/Loss/Continue
+        if (this.currentScore >= this.targetScore) {
+            setTimeout(() => this.winRound(), 1000);
+        } else if (this.handsLeft === 0) {
+            setTimeout(() => this.gameOver(), 1000);
+        }
+        
+        document.getElementById('hand-type-display').innerText = "";
+    }
+
+    animateScoreCalc(chips, mult) {
+        const disp = document.getElementById('calc-display');
+        disp.style.opacity = 1;
+        document.getElementById('base-chips').innerText = Math.floor(chips);
+        document.getElementById('base-mult').innerText = Math.floor(mult);
+        // Simple pulse
+        disp.style.transform = "scale(1.2)";
+        setTimeout(() => disp.style.transform = "scale(1)", 100);
+    }
+    
+    highlightJoker(id) {
+        // Visual feedback for joker triggering
+        const jokers = document.getElementById('jokers-container').children;
+    }
+
+    winRound() {
+        // Add money based on leftover hands/discards (Simple logic)
+        const interest = 1 + this.handsLeft; 
+        this.money += interest + 3; // Base reward
+        
+        this.openShop();
+    }
+
+    gameOver() {
+        // Show Game Over Overlay instead of Alert
+        const overlay = document.getElementById('game-over-overlay');
+        document.getElementById('go-round').innerText = this.round;
+        document.getElementById('go-score').innerText = this.currentScore;
+        overlay.style.display = 'flex';
+    }
+
+    openShop() {
+        const overlay = document.getElementById('shop-overlay');
+        const container = document.getElementById('shop-items-container');
+        document.getElementById('shop-money').innerText = this.money;
+        
+        container.innerHTML = '';
+        
+        // Generate 3 random shop items
+        for(let i=0; i<3; i++) {
+            const item = JOKER_DB[Math.floor(Math.random() * JOKER_DB.length)];
+            const div = document.createElement('div');
+            div.className = 'shop-item';
+            div.innerHTML = `
+                <div style="color:var(--accent); font-weight:bold;">${item.name}</div>
+                <div style="font-size:0.8rem; margin:5px 0;">${item.desc}</div>
+                <span class="shop-price">$${item.cost}</span>
+                <button class="shop-buy-btn" onclick="game.buyJoker('${item.id}', ${item.cost}, this)">BUY</button>
+            `;
+            container.appendChild(div);
+        }
+
+        overlay.style.display = 'flex';
+    }
+
+    buyJoker(id, cost, btnElement) {
+        if (this.money >= cost) {
+            if (this.jokers.length >= 5) {
+                alert("No Joker slots left!");
+                return;
+            }
+            this.money -= cost;
+            document.getElementById('shop-money').innerText = this.money;
+            
+            const template = JOKER_DB.find(j => j.id === id);
+            // Clone to allow duplicates
+            this.jokers.push({...template, uniqueId: Math.random()});
+            
+            btnElement.innerText = "SOLD";
+            btnElement.disabled = true;
+            btnElement.style.background = "#555";
+            
+            this.renderJokers();
+            this.updateUI();
+        } else {
+            btnElement.style.background = "#a00";
+            setTimeout(() => btnElement.style.background = "var(--gold)", 200);
+        }
+    }
+
+    nextRoundFromShop() {
+        document.getElementById('shop-overlay').style.display = 'none';
+        this.round++;
+        // Increase difficulty
+        this.targetScore = Math.floor(this.targetScore * 1.5) + 100;
+        this.startRound();
+    }
+
+    renderHand() {
+        const container = document.getElementById('cards-container');
+        // Pass index for animation staggering
+        container.innerHTML = this.hand.map((c, index) => c.getHTML(index)).join('');
+    }
+
+    renderJokers() {
+        const container = document.getElementById('jokers-container');
+        container.innerHTML = this.jokers.map(j => `
+            <div class="joker-card" title="${j.desc}">
+                J
+                <div class="joker-tooltip">${j.name}: ${j.desc}</div>
+            </div>
+        `).join('');
+    }
+
+    updateUI() {
+        document.getElementById('money-val').innerText = this.money;
+        document.getElementById('round-val').innerText = this.round;
+        document.getElementById('hands-left').innerText = this.handsLeft;
+        document.getElementById('discards-left').innerText = this.discardsLeft;
+        document.getElementById('current-score').innerText = this.currentScore;
+        document.getElementById('target-score').innerText = this.targetScore;
+        
+        this.previewScore();
+        this.renderJokers();
+    }
+
+    showFloatText(text, targetSelector) {
+        const target = document.querySelector(targetSelector);
+        const rect = target.getBoundingClientRect();
+        
+        const el = document.createElement('div');
+        el.className = 'floater';
+        el.innerText = text;
+        el.style.left = (rect.left + rect.width/2 - 20) + 'px';
+        el.style.top = (rect.top) + 'px';
+        el.style.color = 'var(--gold)';
+        
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+}
+
+// Initialize Game
+const game = new Game();
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+        });
+    });
+}
+</script>
+</body>
+</html>
+
